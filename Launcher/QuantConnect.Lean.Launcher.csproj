@@ -60,6 +60,8 @@
     <ProjectReference Include="..\Messaging\QuantConnect.Messaging.csproj" />
     <ProjectReference Include="..\Queues\QuantConnect.Queues.csproj" />
     <ProjectReference Include="..\ToolBox\QuantConnect.ToolBox.csproj" />
+    <ProjectReference Include="..\..\Lean.Brokerages.InteractiveBrokers\QuantConnect.InteractiveBrokersBrokerage\QuantConnect.InteractiveBrokersBrokerage.csproj" />
+    <ProjectReference Include="..\..\Lean.DataSource.CBOE\QuantConnect.DataSource.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\LICENSE">
@@ -69,5 +71,10 @@
     <None Include="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+      <Content Include="..\..\quantconnect-stubs-generator\result\**\*">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
   </ItemGroup>
 </Project>
