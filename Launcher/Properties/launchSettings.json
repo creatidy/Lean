@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "QuantConnect.Lean.Launcher": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "PYTHONNET_PYDLL": "C:\\Python\\Python310\\python310.dll"
+      }
+    }
+  }
+}
