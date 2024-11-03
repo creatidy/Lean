@@ -1949,8 +1949,11 @@ namespace QuantConnect.Algorithm
             if (isCanonical && symbol.SecurityType.IsOption() && symbol.SecurityType != SecurityType.FutureOption)
             {
                 // option is daily only, for now exclude FOPs
-                securityResolution = Resolution.Daily;
-                securityFillForward = false;
+
+                // Adrian Tkacz - Commented line due to options testing 
+
+                //securityResolution = Resolution.Daily;
+                securityFillForward = true;
             }
 
             var isFilteredSubscription = !isCanonical;

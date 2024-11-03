@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "QuantConnect.Lean.Engine": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

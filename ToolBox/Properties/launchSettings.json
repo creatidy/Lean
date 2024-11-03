@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "QuantConnect.ToolBox": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    }
+  }
+}
