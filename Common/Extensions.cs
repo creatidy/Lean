@@ -193,8 +193,10 @@ namespace QuantConnect
 
             var result = marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
 
-            // For option universes, the data time zone is the same as the exchange time zone so that selection
-            // happens at exchange time regardless of whether there exchange and data time zones are different.
+            // For the OptionUniverse type, the exchange and data time zones are set to the same value (exchange tz).
+            // This is not actual options data, just option chains/universe selection, so we don't want any offsets
+            // between the exchange and data time zones.
+            // If the MHDB were data type dependent as well, this would be taken care in there.
             if (result != null && dataTypes.Any(dataType => dataType == typeof(OptionUniverse)))
             {
                 result = new MarketHoursDatabase.Entry(result.ExchangeHours.TimeZone, result.ExchangeHours);
@@ -3822,10 +3824,15 @@ namespace QuantConnect
         {
             foreach (var security in securityChanges.AddedSecurities)
             {
-                security.IsTradable = true;
-
                 // uses TryAdd, so don't need to worry about duplicates here
                 algorithm.Securities.Add(security);
+
+                if (security.Type == SecurityType.Index && !(security as Securities.Index.Index).ManualSetIsTradable)
+                {
+                    continue;
+                }
+
+                security.IsTradable = true;
             }
 
             var activeSecurities = algorithm.UniverseManager.ActiveSecurities;
@@ -4131,7 +4138,12 @@ namespace QuantConnect
                 return (data as Delisting)?.Type == DelistingType.Delisted;
             }
 
-            if (!(type == typeof(Delisting) || type == typeof(Split) || type == typeof(Dividend)))
+            // We let delistings through. We need to emit delistings for all subscriptions, even internals like
+            // continuous futures mapped contracts. For instance, an algorithm might hold a position for a mapped
+            // contract and then the continuous future is mapped to a different contract. If the previously mapped
+            // contract is delisted, we need to let the delisting through so that positions are closed out and the
+            // security is removed from the algorithm and marked as delisted and non-tradable.
+            if (!(type == typeof(Split) || type == typeof(Dividend)))
             {
                 return true;
             }
@@ -4369,9 +4381,14 @@ namespace QuantConnect
             }
         }
 
+        /// <summary>
+        /// Retrieve a common custom data types from the given symbols if any
+        /// </summary>
+        /// <param name="symbols">The target symbols to search</param>
+        /// <returns>The custom data type or null</returns>
         public static Type GetCustomDataTypeFromSymbols(Symbol[] symbols)
         {
-            if (symbols.Any())
+            if (symbols.Length != 0)
             {
                 if (!SecurityIdentifier.TryGetCustomDataTypeInstance(symbols[0].ID.Symbol, out var dataType)
                     || symbols.Any(x => !SecurityIdentifier.TryGetCustomDataTypeInstance(x.ID.Symbol, out var customDataType) || customDataType != dataType))

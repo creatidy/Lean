@@ -23,6 +23,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Tests.Engine.DataFeeds;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace QuantConnect.Tests.Algorithm.Framework.Portfolio
 {
@@ -279,6 +280,45 @@ namespace QuantConnect.Tests.Algorithm.Framework.Portfolio
         }
 
         [Test]
+        public void SignalExportManagerIgnoresIndexSecurities()
+        {
+            var algorithm = new AlgorithmStub(true);
+            algorithm.SetFinishedWarmingUp();
+            algorithm.SetCash(100000);
+
+            var security = algorithm.AddIndexOption("SPX", "SPXW");
+            security.SetMarketPrice(new Tick(new DateTime(2022, 01, 04), security.Symbol, 144.80m, 144.82m));
+            security.Holdings.SetHoldings(144.81m, 10);
+
+            var signalExportManagerHandler = new SignalExportManagerHandler(algorithm);
+            var result = signalExportManagerHandler.GetPortfolioTargets(out PortfolioTarget[] portfolioTargets);
+
+            Assert.IsTrue(result);
+            Assert.IsFalse(portfolioTargets.Where(x => x.Symbol.SecurityType == SecurityType.Index).Any());
+        }
+
+        [TestCaseSource(nameof(SignalExportManagerSkipsNonTradeableFuturesTestCase))]
+        public void SignalExportManagerSkipsNonTradeableFutures(IEnumerable<Symbol> symbols, int expectedNumberOfTargets)
+        {
+            var algorithm = new AlgorithmStub(true);
+            algorithm.SetFinishedWarmingUp();
+            algorithm.SetCash(100000);
+
+            foreach (var symbol in symbols)
+            {
+                var security = algorithm.AddSecurity(symbol);
+                security.SetMarketPrice(new Tick(new DateTime(2022, 01, 04), security.Symbol, 144.80m, 144.82m));
+                security.Holdings.SetHoldings(144.81m, 100);
+            }
+
+            var signalExportManagerHandler = new SignalExportManagerHandler(algorithm);
+            var result = signalExportManagerHandler.GetPortfolioTargets(out PortfolioTarget[] portfolioTargets);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(expectedNumberOfTargets, portfolioTargets.Length);
+        }
+
+        [Test]
         public void SignalExportManagerReturnsFalseWhenNegativeTotalPortfolioValue()
         {
             var algorithm = new AlgorithmStub(true);
@@ -410,5 +450,11 @@ namespace QuantConnect.Tests.Algorithm.Framework.Portfolio
                 return message;
             }
         }
+
+        private static object[] SignalExportManagerSkipsNonTradeableFuturesTestCase =
+        {
+            new object[] { new List<Symbol>() { Symbols.AAPL, Symbols.SPY, Symbols.SPX }, 2 },
+            new object[] { new List<Symbol>() { Symbols.AAPL, Symbols.SPY, Symbols.NFLX }, 3 },
+        };
     }
 }

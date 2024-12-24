@@ -37,6 +37,7 @@ using HistoryRequest = QuantConnect.Data.HistoryRequest;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Tests.Common.Data.Fundamental;
+using QuantConnect.Logging;
 
 namespace QuantConnect.Tests.Algorithm
 {
@@ -596,8 +597,6 @@ def getTickHistory(algorithm, symbol, start, end):
                 Assert.AreEqual(typeof(OptionUniverse), request.DataType);
                 Assert.IsFalse(request.IncludeExtendedMarketHours);
                 Assert.IsFalse(request.IsCustomData);
-                // For OptionUniverse, exchange and data time zones are set to the same value
-                Assert.AreEqual(request.ExchangeHours.TimeZone, request.DataTimeZone);
             }
         }
 
@@ -3227,6 +3226,247 @@ def getHistory(algorithm, symbol, period):
             }
         }
 
+        [Test]
+        public void PythonUniverseHistoryDataFramesAreFlattened()
+        {
+            var algorithm = GetAlgorithm(new DateTime(2014, 03, 28));
+            var universe = algorithm.AddUniverse(x => x.Select(x => x.Symbol));
+
+            using (Py.GIL())
+            {
+                PythonInitializer.Initialize();
+                algorithm.SetPandasConverter();
+
+                var testModule = PyModule.FromString("PythonHistoryDataFramesAreFlattened",
+                    @"
+from AlgorithmImports import *
+
+def getFlattenedUniverseHistory(algorithm, universe, period):
+    return algorithm.history(universe, period, flatten=True)
+
+def getUnflattenedUniverseHistory(algorithm, universe, period):
+    return algorithm.history(universe, period)
+
+def assertFlattenedHistoryDates(df, expected_dates):
+    assert df.index.levels[0].to_list() == expected_dates, f'Expected dates: {expected_dates}, actual dates: {df.index.levels[0].to_list()}'
+
+def assertUnflattenedHistoryDates(df, expected_dates):
+    assert df.index.to_list() == expected_dates, f'Expected dates: {expected_dates}, actual dates: {df.index.levels[0].to_list()}'
+
+def assertConstituents(flattened_df, unflattened_df, dates, expected_constituents_per_date):
+    for i, date in enumerate(dates):
+        unflattened_universe = unflattened_df.loc[date]
+        assert isinstance(unflattened_universe, list), f'Unflattened DF: expected a list, found {type(unflattened_universe)}'
+        assert len(unflattened_universe) == expected_constituents_per_date[i], f'Unflattened DF: expected {expected_constituents_per_date[i]} constituents for date {date}, got {len(unflattened_universe)}'
+
+        for constituent in unflattened_universe:
+            assert isinstance(constituent, Fundamental), f'Unflattened DF: expected a list of Fundamental, found {type(constituent)}'
+
+        flattened_sub_df = flattened_df.loc[date]
+        assert flattened_sub_df.shape[0] == len(unflattened_universe), f'Flattened DF: expected {len(unflattened_universe)} rows for date {date}, got {flattened_sub_df.shape[0]}'
+
+        flattened_universe_symbols = flattened_sub_df.index.to_list()
+        unflattened_universe_symbols = [constituent.symbol for constituent in unflattened_universe]
+        flattened_universe_symbols.sort()
+        unflattened_universe_symbols.sort()
+        assert flattened_universe_symbols == unflattened_universe_symbols, f'Flattened DF: flattened universe symbols are not equal to unflattened universe symbols for date {date}'
+    ");
+                dynamic getFlattenedUniverseHistory = testModule.GetAttr("getFlattenedUniverseHistory");
+                var flattenedDf = getFlattenedUniverseHistory(algorithm, universe, 3);
+
+                dynamic getUnflattenedUniverseHistory = testModule.GetAttr("getUnflattenedUniverseHistory");
+                var unflattenedDf = getUnflattenedUniverseHistory(algorithm, universe, 3);
+                // Drop the symbol
+                unflattenedDf = unflattenedDf.droplevel(0);
+
+                var expectedDates = new List<DateTime>
+                {
+                    new DateTime(2014, 03, 26),
+                    new DateTime(2014, 03, 27),
+                    new DateTime(2014, 03, 28)
+                };
+                dynamic assertFlattenedHistoryDates = testModule.GetAttr("assertFlattenedHistoryDates");
+                AssertDesNotThrowPythonException(() => assertFlattenedHistoryDates(flattenedDf, expectedDates));
+
+                dynamic assertUnflattenedHistoryDates = testModule.GetAttr("assertUnflattenedHistoryDates");
+                AssertDesNotThrowPythonException(() => assertUnflattenedHistoryDates(unflattenedDf, expectedDates));
+
+                var expectedConstituentsCounts = new[] { 7068, 7055, 7049 };
+                dynamic assertConstituents = testModule.GetAttr("assertConstituents");
+                AssertDesNotThrowPythonException(() => assertConstituents(flattenedDf, unflattenedDf, expectedDates, expectedConstituentsCounts));
+            }
+        }
+
+        [Test]
+        public void CSharpCustomUniverseHistoryDataFramesHaveExpectedFormat()
+        {
+            var algorithm = GetAlgorithm(new DateTime(2015, 01, 15));
+            var universe = algorithm.AddUniverse<CustomUniverseData>("CustomUniverse", Resolution.Daily, (x) => x.Select(y => y.Symbol));
+
+            using (Py.GIL())
+            {
+                PythonInitializer.Initialize();
+                algorithm.SetPandasConverter();
+
+                using var testModule = PyModule.FromString("PythonCustomUniverseHistoryDataFramesHaveExpectedFormat",
+                    $@"
+from AlgorithmImports import *
+
+def get_universe_history(algorithm, universe, flatten):
+    return algorithm.history(universe, 3, flatten=flatten)
+    ");
+
+                dynamic getUniverseHistory = testModule.GetAttr("get_universe_history");
+                var df = getUniverseHistory(algorithm, universe, false);
+                var flattenedDf = getUniverseHistory(algorithm, universe, true);
+
+                Func<CustomUniverseData, decimal> getWeight = (data) => data.Weight;
+                AssertCustomUniverseDataFrames(df, flattenedDf, getWeight);
+
+                var columns = ((List<PyObject>)flattenedDf.columns.to_list().As<List<PyObject>>())
+                    .Select(column => column.InvokeMethod("__str__").GetAndDispose<string>());
+                CollectionAssert.DoesNotContain(columns, "data");
+            }
+        }
+
+        [Test]
+        public void PythonCustomUniverseHistoryDataFramesHaveExpectedFormat()
+        {
+            var algorithm = GetAlgorithm(new DateTime(2015, 01, 15));
+
+            using (Py.GIL())
+            {
+                PythonInitializer.Initialize();
+                algorithm.SetPandasConverter();
+
+                using var testModule = PyModule.FromString("PythonCustomUniverseHistoryDataFramesHaveExpectedFormat",
+                    $@"
+from AlgorithmImports import *
+
+class CustomUniverseData(PythonData):
+
+    def get_source(self, config: SubscriptionDataConfig, date: datetime, is_live_mode: bool) -> SubscriptionDataSource:
+        return SubscriptionDataSource('TestData/portfolio_targets.csv',
+                                      SubscriptionTransportMedium.LOCAL_FILE,
+                                      FileFormat.FOLDING_COLLECTION)
+
+    def reader(self, config: SubscriptionDataConfig, line: str, date: datetime, is_live_mode: bool) -> BaseData:
+        # Skip the header row.
+        if not line[0].isnumeric():
+            return None
+        items = line.split(',')
+        data = CustomUniverseData()
+        data.end_time = datetime.strptime(items[0], '%Y-%m-%d')
+        data.time = data.end_time - timedelta(1)
+        data.symbol = Symbol.create(items[1], SecurityType.EQUITY, Market.USA)
+        data['weight'] = float(items[2])
+        return data
+
+def get_universe_history(algorithm, flatten):
+    universe = algorithm.add_universe(CustomUniverseData, 'CustomUniverse', Resolution.DAILY, lambda alt_coarse: [x.symbol for x in alt_coarse])
+    return algorithm.history(universe, 3, flatten=flatten)
+
+    ");
+
+                dynamic getUniverseHistory = testModule.GetAttr("get_universe_history");
+                var df = getUniverseHistory(algorithm, false);
+                var flattenedDf = getUniverseHistory(algorithm, true);
+
+                Func<PythonData, decimal> getWeight = (data) => Convert.ToDecimal(data.GetProperty("weight"));
+                AssertCustomUniverseDataFrames(df, flattenedDf, getWeight);
+            }
+        }
+
+        public class CustomUniverseData : BaseDataCollection
+        {
+            public decimal Weight { get; private set; }
+
+            public override SubscriptionDataSource GetSource(SubscriptionDataConfig config, DateTime date, bool isLiveMode)
+            {
+                return new SubscriptionDataSource("TestData/portfolio_targets.csv",
+                    SubscriptionTransportMedium.LocalFile,
+                    FileFormat.FoldingCollection);
+            }
+
+            public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode)
+            {
+                var csv = line.Split(',');
+
+                try
+                {
+                    var endTime = DateTime.ParseExact(csv[0], "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var symbol = Symbol.Create(csv[1], SecurityType.Equity, Market.USA);
+                    var weight = Convert.ToDecimal(csv[2], CultureInfo.InvariantCulture);
+
+                    return new CustomUniverseData
+                    {
+                        Symbol = symbol,
+                        Time = endTime - TimeSpan.FromDays(1),
+                        EndTime = endTime,
+                        Weight = weight
+                    };
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        private static void AssertCustomUniverseDataFrames<T>(dynamic df, dynamic flattenedDf, Func<T, decimal> getWeight)
+            where T : BaseData
+        {
+            var expectedDates = new List<DateTime>
+                {
+                    new DateTime(2015, 01, 13),
+                    new DateTime(2015, 01, 14),
+                    new DateTime(2015, 01, 15),
+                };
+
+            var flattenedDfDates = ((List<DateTime>)flattenedDf.index.get_level_values(0).to_list().As<List<DateTime>>()).Distinct().ToList();
+            CollectionAssert.AreEqual(expectedDates, flattenedDfDates);
+
+            var dfDates = ((List<DateTime>)df.index.get_level_values(1).to_list().As<List<DateTime>>()).Distinct().ToList();
+            CollectionAssert.AreEqual(expectedDates, dfDates);
+
+            df = df.droplevel(0); // drop symbol just to make access easier
+            foreach (var date in expectedDates)
+            {
+                using var pyDate = date.ToPython();
+                var constituents = (List<T>)df.loc[pyDate].As<List<T>>();
+                var flattendDfConstituents = flattenedDf.loc[pyDate];
+
+                CollectionAssert.IsNotEmpty(constituents);
+                Assert.AreEqual(flattendDfConstituents.shape[0].As<int>(), constituents.Count);
+
+                var constituentsSymbols = constituents.Select(x => x.Symbol).ToList();
+                var flattendDfConstituentsSymbols = ((List<Symbol>)flattendDfConstituents.index.to_list().As<List<Symbol>>()).ToList();
+                CollectionAssert.AreEqual(flattendDfConstituentsSymbols, constituentsSymbols);
+
+                var constituentsWeights = constituents.Select(x => getWeight(x)).ToList();
+                var flattendDfConstituentsWeights = constituentsSymbols
+                    .Select(symbol => flattendDfConstituents.loc[symbol.ToPython()]["weight"].As<decimal>())
+                    .Cast<decimal>()
+                    .ToList();
+                CollectionAssert.AreEqual(flattendDfConstituentsWeights, constituentsWeights);
+            }
+
+            Log.Debug((string)df.to_string());
+            Log.Debug((string)flattenedDf.to_string());
+        }
+
+        private static void AssertDesNotThrowPythonException(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (PythonException ex)
+            {
+                Assert.Fail(ex.Message);
+            }
+        }
+
         private class ThrowingHistoryProvider : HistoryProviderBase
         {
             public override int DataPointCount => 0;
@@ -3343,10 +3583,10 @@ def getHistory(algorithm, symbol, period):
         }
 
         /// <summary>
-        /// Represents custom data with an optional sorting functionality. The <see cref="ExampleCustomDataWithSort"/> class 
+        /// Represents custom data with an optional sorting functionality. The <see cref="ExampleCustomDataWithSort"/> class
         /// allows you to specify a static property <seealso cref="CustomDataKey"/>, which defines the name of the custom data source.
         /// Sorting can be enabled or disabled by setting the <seealso cref="Sort"/> property.
-        /// This class overrides <see cref="GetSource(SubscriptionDataConfig, DateTime, bool)"/> to initialize the 
+        /// This class overrides <see cref="GetSource(SubscriptionDataConfig, DateTime, bool)"/> to initialize the
         /// <seealso cref="SubscriptionDataSource.Sort"/> property based on the value of <see cref="Sort"/>.
         /// </summary>
         public class ExampleCustomDataWithSort : BaseData
@@ -3367,7 +3607,7 @@ def getHistory(algorithm, symbol, period):
             public decimal Close { get; set; }
 
             /// <summary>
-            /// Returns the data source for the subscription. It uses the custom data key and sets sorting based on the 
+            /// Returns the data source for the subscription. It uses the custom data key and sets sorting based on the
             /// <see cref="Sort"/> property.
             /// </summary>
             /// <param name="config">Subscription configuration.</param>
@@ -3573,15 +3813,8 @@ def getHistory(algorithm, symbol, period):
                 if (resolution == Resolution.Daily)
                 {
                     var exchange = mhdb.GetExchangeHours(data.Symbol.ID.Market, data.Symbol, data.Symbol.SecurityType);
-                    if (!data.IsFillForward)
-                    {
-                        var marketHours = exchange.GetMarketHours(data.EndTime);
-                        expectedTimeSpan = marketHours.MarketDuration;
-                    }
-                    else
-                    {
-                        expectedTimeSpan = exchange.RegularMarketDuration;
-                    }
+                    var marketHours = exchange.GetMarketHours(data.EndTime);
+                    expectedTimeSpan = marketHours.MarketDuration;
                 }
                 return data.EndTime - data.Time == expectedTimeSpan;
         }));
