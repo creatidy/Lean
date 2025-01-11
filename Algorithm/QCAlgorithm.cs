@@ -3394,8 +3394,19 @@ namespace QuantConnect.Algorithm
             var optionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType != SecurityType.FutureOption);
             var futureOptionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType == SecurityType.FutureOption);
 
-            var optionChainsData = History(optionCanonicalSymbols, 1).GetUniverseData()
-                .Select(x => (x.Keys.Single(), x.Values.Single().Cast<OptionUniverse>()));
+            // Adrian Tkacz - fix for live trading (now solution is not working live)
+            //var optionChainsData = History(optionCanonicalSymbols, 1).GetUniverseData()
+            //    .Select(x => (x.Keys.Single(), x.Values.Single().Cast<OptionUniverse>()));
+            var optionChainsData = optionCanonicalSymbols.Select(symbol =>
+            {
+                var optionChainData = OptionChainProvider.GetOptionContractList(symbol, Time)
+                    .Select(contractSymbol => new OptionUniverse()
+                    {
+                        Symbol = contractSymbol,
+                        EndTime = Time.Date,
+                    });
+                return (symbol, optionChainData);
+            });
 
             // TODO: For FOPs, we fall back to the option chain provider until OptionUniverse supports them
             var futureOptionChainsData = futureOptionCanonicalSymbols.Select(symbol =>

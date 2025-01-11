@@ -1,39 +1,35 @@
 {
-  // "environment": "live-interactive", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
-  // "data-channel": "interactive",
-  "environment": "live-interactive", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
-  "data-channel": "interactive",
-  "close-automatically": true,
+  // this configuration file works by first loading all top-level
+  // configuration items and then will load the specified environment
+  // on top, this provides a layering affect. environment names can be
+  // anything, and just require definition in this file. There's
+  // two predefined environments, 'backtesting' and 'live', feel free
+  // to add more!
 
-  // Added 2024.06.02
-  "binance-exchange-name": "Binance",
-  "binance-use-testnet": "live",
+  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "OptionsTradingBot",
+  "algorithm-type-name": "BasicTemplateFrameworkAlgorithm",
 
   // Algorithm language selector - options CSharp, Python
-  "algorithm-language": "Python",
-
+  "algorithm-language": "CSharp",
 
   //Physical DLL location
-  //"algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
-  "algorithm-location": "C:\\Users\\adria\\workspace\\QuantConnect\\OptionsTradingBot\\main.py",
+  "algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
+  //"algorithm-location": "../../../Algorithm.Python/BasicTemplateFrameworkAlgorithm.py",
 
   //Research notebook
   //"composer-dll-directory": ".",
 
   // engine
   "data-folder": "../../../Data/",
-  //"results-destination-folder": "C://Users//adria//workspace//QuantConnect/OptionsTradingBot//Results",
-  //"object-store-root": "C://Users//adria//workspace//QuantConnect/OptionsTradingBot//Storage",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, Debugpy, PyCharm
-  "debugging": true,
-  "debugging-method": "ptvsd",
+  "debugging": false,
+  "debugging-method": "LocalCmdline",
 
   // location of a python virtual env to use libraries from
-  "python-venv": "C:\\Users\\adria\\workspace\\.venv\\quantconnect",
+  //"python-venv": "/venv",
 
   // handlers
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -42,10 +38,8 @@
   "api-handler": "QuantConnect.Api.Api",
   "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
   "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
-  // "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
   "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
-  "data-channel-provider": "QuantConnect.Lean.Engine.DataFeeds.DataChannelProvider",
-
+  "data-channel-provider": "DataChannelProvider",
   "object-store": "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
   "data-aggregator": "QuantConnect.Lean.Engine.DataFeeds.AggregationManager",
 
@@ -75,8 +69,7 @@
   "reserved-words-prefix": "@",
 
   // To get your api access token go to quantconnect.com/account
-  "job-user-id": "",
-  "job-project-id": "",
+  "job-user-id": "0",
   "api-access-token": "",
   "job-organization-id": "",
 
@@ -89,16 +82,16 @@
   "live-holdings": "[]",
 
   // interactive brokers configuration
-  "ib-account": "", //"",   // 
-  "ib-user-name": "", //"", // "",
-  "ib-password": "", // ""
+  "ib-account": "",
+  "ib-user-name": "",
+  "ib-password": "",
   "ib-host": "127.0.0.1",
   "ib-port": "4002",
   "ib-agent-description": "Individual",
   "ib-tws-dir": "C:\\Jts",
   "ib-trading-mode": "paper",
-  "ib-enable-delayed-streaming-data": true,
-  "ib-version": "1019",
+  "ib-enable-delayed-streaming-data": false,
+  "ib-version": "974",
   "ib-weekly-restart-utc-time": "22:00:00",
 
   // tradier configuration
@@ -212,16 +205,17 @@
   // Trade Station configuration
   "trade-station-client-id": "",
   "trade-station-client-secret": "",
-  "trade-station-code-from-url": "",
   "trade-station-redirect-url": "http://localhost",
   "trade-station-refresh-token": "",
   "trade-station-api-url": "https://sim-api.tradestation.com",
   "trade-station-account-type": "Cash|Margin|Futures",
-  // [Optional] Trade Station Proxy Settings
-  "trade-station-use-proxy": false,
-  "trade-station-proxy-address-port": "",
-  "trade-station-proxy-username": "",
-  "trade-station-proxy-password": "",
+  "trade-station-account-id": "",
+
+  // Alpaca configuration
+  "alpaca-api-key": "",
+  "alpaca-api-secret": "",
+  "alpaca-access-token": "",
+  "alpaca-paper-trading": true,
 
   // Charles Schwab configuration
   "charles-schwab-api-url": "https://api.schwabapi.com",
