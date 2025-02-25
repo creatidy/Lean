@@ -322,6 +322,18 @@ namespace QuantConnect.Securities
             /// </summary>
             /// <returns>The symbol</returns>
             public const string MicroBTC = "MBT";
+
+            /// <summary>
+            /// BTIC on Micro Ether Futures
+            /// </summary>
+            /// <returns>The symbol</returns>
+            public const string BTICMicroEther = "MRB";
+
+            /// <summary>
+            /// BTIC on Micro Bitcoin Futures
+            /// </summary>
+            /// <returns>The symbol</returns>
+            public const string BTICMicroBTC = "MIB";
         }
 
         /// <summary>
@@ -1542,6 +1554,12 @@ namespace QuantConnect.Securities
             /// </summary>
             /// <returns>The symbol</returns>
             public const string BseSensex = "SENSEX";
+
+            /// <summary>
+            /// Hang Seng Index
+            /// </summary>
+            /// <returns>The symbol</returns>
+            public const string HangSeng = "HSI";
 
             /// <summary>
             /// Micro E-mini S&amp;P 500 Index Futures
