@@ -193,11 +193,11 @@ namespace QuantConnect
 
             var result = marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
 
-            // For the OptionUniverse type, the exchange and data time zones are set to the same value (exchange tz).
-            // This is not actual options data, just option chains/universe selection, so we don't want any offsets
+            // For the OptionUniverse and FutureUniverse types, the exchange and data time zones are set to the same value (exchange tz).
+            // This is not actual options/futures data, just chains/universe selection, so we don't want any offsets
             // between the exchange and data time zones.
             // If the MHDB were data type dependent as well, this would be taken care in there.
-            if (result != null && dataTypes.Any(dataType => dataType == typeof(OptionUniverse)))
+            if (result != null && dataTypes.Any(dataType => dataType.IsAssignableTo(typeof(BaseChainUniverseData))))
             {
                 result = new MarketHoursDatabase.Entry(result.ExchangeHours.TimeZone, result.ExchangeHours);
             }
@@ -3345,6 +3345,34 @@ namespace QuantConnect
         /// <returns>The result of the task</returns>
         public static T SynchronouslyAwaitTask<T>(this Task<T> task)
         {
+            return SynchronouslyAwaitTaskResult(task);
+        }
+
+        /// <summary>
+        /// Safely blocks until the specified task has completed executing
+        /// </summary>
+        /// <param name="task">The task to be awaited</param>
+        /// <returns>The result of the task</returns>
+        public static void SynchronouslyAwaitTask(this ValueTask task)
+        {
+            if (task.IsCompleted)
+            {
+                return;
+            }
+            task.ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Safely blocks until the specified task has completed executing
+        /// </summary>
+        /// <param name="task">The task to be awaited</param>
+        /// <returns>The result of the task</returns>
+        public static T SynchronouslyAwaitTask<T>(this ValueTask<T> task)
+        {
+            if (task.IsCompleted)
+            {
+                return task.Result;
+            }
             return task.ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
@@ -3866,13 +3894,6 @@ namespace QuantConnect
             {
                 // uses TryAdd, so don't need to worry about duplicates here
                 algorithm.Securities.Add(security);
-
-                if (security.Type == SecurityType.Index && !(security as Securities.Index.Index).ManualSetIsTradable)
-                {
-                    continue;
-                }
-
-                security.IsTradable = true;
             }
 
             var activeSecurities = algorithm.UniverseManager.ActiveSecurities;
@@ -3880,8 +3901,20 @@ namespace QuantConnect
             {
                 if (!activeSecurities.ContainsKey(security.Symbol))
                 {
-                    security.IsTradable = false;
+                    security.Reset();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Helper method to set the <see cref="Security.IsTradable"/> property to <code>true</code>
+        /// for the given security when possible
+        /// </summary>
+        public static void MakeTradable(this Security security)
+        {
+            if (security.Type != SecurityType.Index || (security as Securities.Index.Index).ManualSetIsTradable)
+            {
+                security.IsTradable = true;
             }
         }
 
@@ -4159,7 +4192,7 @@ namespace QuantConnect
             var expectedType = type.IsAssignableTo(config.Type);
 
             // Check our config type first to be lazy about using data.GetType() unless required
-            var configTypeFilter = (config.Type == typeof(TradeBar) || config.Type == typeof(ZipEntryName) ||
+            var configTypeFilter = (config.Type == typeof(TradeBar) || config.Type.IsAssignableTo(typeof(BaseChainUniverseData)) ||
                 config.Type == typeof(Tick) && config.TickType == TickType.Trade || config.IsCustomData);
 
             if (!configTypeFilter)

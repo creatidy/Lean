@@ -1026,7 +1026,7 @@ namespace QuantConnect.Algorithm
                 {
                     // If no requested type was passed, use the config type to get the resolution (if not provided) and the exchange hours
                     var type = requestedType ?? config.Type;
-                    var res = GetResolution(symbol, resolution, type);
+                    var res = resolution ?? config.Resolution;
                     var exchange = GetExchangeHours(symbol, type);
                     var start = _historyRequestFactory.GetStartTimeAlgoTz(symbol, periods, res, exchange, config.DataTimeZone,
                         config.Type, extendedMarketHours);
@@ -1125,15 +1125,13 @@ namespace QuantConnect.Algorithm
                 if (symbol.IsCanonical() && configs.Count > 1)
                 {
                     // option/future (canonicals) might add in a ZipEntryName auxiliary data type used for selection, we filter it out from history requests by default
-                    return configs.Where(s => s.Type != typeof(ZipEntryName));
+                    return configs.Where(s => !s.Type.IsAssignableTo(typeof(BaseChainUniverseData)));
                 }
 
                 return configs;
             }
             else
             {
-                resolution = GetResolution(symbol, resolution, type);
-
                 // If type was specified and not a lean data type and also not abstract, we create a new subscription
                 if (type != null && !LeanData.IsCommonLeanDataType(type) && !type.IsAbstract)
                 {
@@ -1141,9 +1139,17 @@ namespace QuantConnect.Algorithm
                     var isCustom = Extensions.IsCustomDataType(symbol, type);
                     var entry = MarketHoursDatabase.GetEntry(symbol, new[] { type });
 
+                    // Retrieve the associated data type from the universe if available, otherwise, use the provided type
+                    var dataType = UniverseManager.TryGetValue(symbol, out var universe) && type.IsAssignableFrom(universe.DataType)
+                        ? universe.DataType
+                        : type;
+
+                    // Determine resolution using the data type
+                    resolution = GetResolution(symbol, resolution, dataType);
+
                     // we were giving a specific type let's fetch it
                     return new[] { new SubscriptionDataConfig(
-                        type,
+                        dataType,
                         symbol,
                         resolution.Value,
                         entry.DataTimeZone,
@@ -1152,24 +1158,26 @@ namespace QuantConnect.Algorithm
                         UniverseSettings.ExtendedMarketHours,
                         true,
                         isCustom,
-                        LeanData.GetCommonTickTypeForCommonDataTypes(type, symbol.SecurityType),
+                        LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType),
                         true,
                         UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType))};
                 }
 
+                var res = GetResolution(symbol, resolution, type);
                 return SubscriptionManager
-                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, resolution.Value, symbol.IsCanonical())
+                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, res, symbol.IsCanonical())
                     .Where(tuple => SubscriptionDataConfigTypeFilter(type, tuple.Item1))
                     .Select(x =>
                     {
                         var configType = x.Item1;
                         // Use the config type to get an accurate mhdb entry
                         var entry = MarketHoursDatabase.GetEntry(symbol, new[] { configType });
+                        var res = GetResolution(symbol, resolution, configType);
 
                         return new SubscriptionDataConfig(
                             configType,
                             symbol,
-                            resolution.Value,
+                            res,
                             entry.DataTimeZone,
                             entry.ExchangeHours.TimeZone,
                             UniverseSettings.FillForward,
@@ -1288,6 +1296,7 @@ namespace QuantConnect.Algorithm
             return symbol.SecurityType == SecurityType.Future ||
                 symbol.SecurityType == SecurityType.Option ||
                 symbol.SecurityType == SecurityType.IndexOption ||
+                symbol.SecurityType == SecurityType.FutureOption ||
                 !symbol.IsCanonical();
         }
 
