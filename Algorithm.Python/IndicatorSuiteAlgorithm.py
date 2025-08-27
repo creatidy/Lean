@@ -12,7 +12,6 @@
 # limitations under the License.
 
 from AlgorithmImports import *
-from QuantConnect.Algorithm.CSharp import *
 
 ### <summary>
 ### Basic template algorithm simply initializes the date range and cash. This is a skeleton
@@ -80,8 +79,8 @@ class IndicatorSuiteAlgorithm(QCAlgorithm):
             'MAX' : self.max(self._symbol, 14, Resolution.DAILY, Field.LOW),
             # ATR and AROON are special in that they accept a TradeBar instance instead of a decimal, we could easily project and/or transform the input TradeBar
             # before it gets sent to the ATR/AROON indicator, here we use a function that will multiply the input trade bar by a factor of two
-            'ATR' : self.atr(self._symbol, 14, MovingAverageType.SIMPLE, Resolution.DAILY, Func[IBaseData, IBaseDataBar](self.selector_double__trade_bar)),
-            'AROON' : self.aroon(self._symbol, 20, Resolution.DAILY, Func[IBaseData, IBaseDataBar](self.selector_double__trade_bar))
+            'ATR' : self.atr(self._symbol, 14, MovingAverageType.SIMPLE, Resolution.DAILY, self.selector_double__trade_bar),
+            'AROON' : self.aroon(self._symbol, 20, Resolution.DAILY, self.selector_double__trade_bar)
         }
 
         # Custom Data Indicator:
@@ -180,3 +179,23 @@ class IndicatorSuiteAlgorithm(QCAlgorithm):
         trade_bar.value = 2 * bar.value
         trade_bar.period = bar.period
         return trade_bar
+
+
+class CustomData(PythonData):
+    def get_source(self, config, date, is_live):
+        zip_file_name = LeanData.generate_zip_file_name(config.Symbol, date, config.Resolution, config.TickType)
+        source = Globals.data_folder + "/equity/usa/daily/" + zip_file_name
+        return SubscriptionDataSource(source)
+
+    def reader(self, config, line, date, is_live):
+        if line == None:
+            return None
+
+        custom_data = CustomData()
+        custom_data.symbol = config.symbol
+
+        csv = line.split(",")
+        custom_data.time = datetime.strptime(csv[0], '%Y%m%d %H:%M')
+        custom_data.end_time = custom_data.time + timedelta(days=1)
+        custom_data.value = float(csv[1]) / 10000.0
+        return custom_data

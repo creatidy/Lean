@@ -1053,7 +1053,23 @@ namespace QuantConnect.Algorithm
                 // lets make sure to respect the order of the data types
                 .ThenByDescending(config => GetTickTypeOrder(config.SecurityType, config.TickType));
 
-            var matchingSubscriptions = subscriptions.Where(s => SubscriptionDataConfigTypeFilter(type, s.Type));
+            var matchingSubscriptions = Enumerable.Empty<SubscriptionDataConfig>();
+
+            if (type == typeof(Tick))
+            {
+                // If type is Tick, don't rely on matchingSubscriptions
+                // Instead, we generate all available Tick subscriptions for the given resolution,
+                // to avoid cases where, for example with a FutureContract, only OpenInterest would match,
+                // when we actually need to generate Trade, Quote, and OpenInterest.
+                matchingSubscriptions = subscriptions.Where(s => LeanData.IsCommonLeanDataType(s.Type))
+                    .Select(s => s.Type == type ? s : new SubscriptionDataConfig(s, type, resolution: Resolution.Tick,
+                        tickType: LeanData.GetCommonTickTypeForCommonDataTypes(s.Type, s.SecurityType)));
+            }
+            else
+            {
+                // Filter subscriptions matching the requested type
+                matchingSubscriptions = subscriptions.Where(s => SubscriptionDataConfigTypeFilter(type, s.Type));
+            }
 
             var internalConfig = new List<SubscriptionDataConfig>();
             var userConfig = new List<SubscriptionDataConfig>();
@@ -1095,9 +1111,8 @@ namespace QuantConnect.Algorithm
                         return configs.Where(s => s.TickType != TickType.Quote);
                     }
 
-
                     // If no existing configuration for the Quote tick type, add the new config
-                    if (type == null && !configs.Any(config => config.TickType == TickType.Quote))
+                    if ((type == null || type == typeof(Tick)) && !configs.Any(config => config.TickType == TickType.Quote))
                     {
                         type = LeanData.GetDataType(resolution.Value, TickType.Quote);
                         var entry = MarketHoursDatabase.GetEntry(symbol, new[] { type });
@@ -1163,9 +1178,14 @@ namespace QuantConnect.Algorithm
                         UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType))};
                 }
 
+                // let's try to respect already added user settings, even if resolution/type don't match, like Tick vs Bars
+                var userConfigIfAny = subscriptions.FirstOrDefault(x => LeanData.IsCommonLeanDataType(x.Type) && !x.IsInternalFeed);
+
                 var res = GetResolution(symbol, resolution, type);
                 return SubscriptionManager
-                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, res, symbol.IsCanonical())
+                    .LookupSubscriptionConfigDataTypes(symbol.SecurityType, res,
+                        // for continuous contracts, if we are given a type (or none) that's common (like trade/quote), we respect it
+                        symbol.IsCanonical() && (symbol.SecurityType != SecurityType.Future || type != null && !LeanData.IsCommonLeanDataType(type)))
                     .Where(tuple => SubscriptionDataConfigTypeFilter(type, tuple.Item1))
                     .Select(x =>
                     {
@@ -1181,12 +1201,14 @@ namespace QuantConnect.Algorithm
                             entry.DataTimeZone,
                             entry.ExchangeHours.TimeZone,
                             UniverseSettings.FillForward,
-                            UniverseSettings.ExtendedMarketHours,
+                            userConfigIfAny?.ExtendedMarketHours ?? UniverseSettings.ExtendedMarketHours,
                             true,
                             false,
                             x.Item2,
                             true,
-                            UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType));
+                            userConfigIfAny?.DataNormalizationMode ?? UniverseSettings.GetUniverseNormalizationModeOrDefault(symbol.SecurityType),
+                            userConfigIfAny?.DataMappingMode ?? UniverseSettings.GetUniverseMappingModeOrDefault(symbol.SecurityType, symbol.ID.Market),
+                            userConfigIfAny?.ContractDepthOffset ?? (uint)Math.Abs(UniverseSettings.ContractDepthOffset));
                     })
                     // lets make sure to respect the order of the data types, if used on a history request will affect outcome when using pushthrough for example
                     .OrderByDescending(config => GetTickTypeOrder(config.SecurityType, config.TickType));
@@ -1257,7 +1279,8 @@ namespace QuantConnect.Algorithm
                 }
             }
 
-            if (result != null)
+            // if resolution is tick, type should be tick or not common, meaning should not use resolution tick with quoteBar/tradeBar/openinterest types
+            if (result != null && (result.Value != Resolution.Tick || type == typeof(Tick) || !LeanData.IsCommonLeanDataType(type)))
             {
                 return (Resolution)result;
             }

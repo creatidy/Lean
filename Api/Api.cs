@@ -571,7 +571,7 @@ namespace QuantConnect.Api
                 }
 
                 // Update our result
-                foreach(var updatedChart in updatedCharts)
+                foreach (var updatedChart in updatedCharts)
                 {
                     result.Backtest.Charts[updatedChart.Key] = updatedChart.Value;
                 }
@@ -888,19 +888,14 @@ namespace QuantConnect.Api
         /// Get a list of live running algorithms for user
         /// </summary>
         /// <param name="status">Filter the statuses of the algorithms returned from the api</param>
-        /// <param name="startTime">Earliest launched time of the algorithms returned by the Api</param>
-        /// <param name="endTime">Latest launched time of the algorithms returned by the Api</param>
         /// <returns><see cref="LiveList"/></returns>
-
-        public LiveList ListLiveAlgorithms(AlgorithmStatus? status = null,
-                                           DateTime? startTime = null,
-                                           DateTime? endTime = null)
+        public LiveList ListLiveAlgorithms(AlgorithmStatus? status = null)
         {
             // Only the following statuses are supported by the Api
-            if (status.HasValue                        &&
-                status != AlgorithmStatus.Running      &&
+            if (status.HasValue &&
+                status != AlgorithmStatus.Running &&
                 status != AlgorithmStatus.RuntimeError &&
-                status != AlgorithmStatus.Stopped      &&
+                status != AlgorithmStatus.Stopped &&
                 status != AlgorithmStatus.Liquidated)
             {
                 throw new ArgumentException(
@@ -912,18 +907,11 @@ namespace QuantConnect.Api
                 RequestFormat = DataFormat.Json
             };
 
-            var epochStartTime = startTime == null ? 0 : Time.DateTimeToUnixTimeStamp(startTime.Value);
-            var epochEndTime   = endTime   == null ? Time.DateTimeToUnixTimeStamp(DateTime.UtcNow) : Time.DateTimeToUnixTimeStamp(endTime.Value);
-
-            JObject obj = new JObject
-            {
-                { "start", epochStartTime },
-                { "end", epochEndTime }
-            };
+            var obj = new JObject();
 
             if (status.HasValue)
             {
-                obj.Add("status", status.ToString());
+                obj["status"] = status.ToString();
             }
 
             request.AddParameter("application/json", JsonConvert.SerializeObject(obj), ParameterType.RequestBody);
@@ -1157,7 +1145,7 @@ namespace QuantConnect.Api
             ApiConnection.TryRequest(request, out result);
 
             var finish = DateTime.UtcNow.AddMinutes(1);
-            while(DateTime.UtcNow < finish && result.Chart == null)
+            while (DateTime.UtcNow < finish && result.Chart == null)
             {
                 Thread.Sleep(5000);
                 ApiConnection.TryRequest(request, out result);
@@ -1411,18 +1399,6 @@ namespace QuantConnect.Api
         /// <param name="sharpe">Sharpe ratio since inception</param>
 
         public virtual void SendStatistics(string algorithmId, decimal unrealized, decimal fees, decimal netProfit, decimal holdings, decimal equity, decimal netReturn, decimal volume, int trades, double sharpe)
-        {
-            //
-        }
-
-        /// <summary>
-        /// Send an email to the user associated with the specified algorithm id
-        /// </summary>
-        /// <param name="algorithmId">The algorithm id</param>
-        /// <param name="subject">The email subject</param>
-        /// <param name="body">The email message body</param>
-
-        public virtual void SendUserEmail(string algorithmId, string subject, string body)
         {
             //
         }
