@@ -33,6 +33,18 @@ namespace QuantConnect.Brokerages
     public class InteractiveBrokersBrokerageModel : DefaultBrokerageModel
     {
         /// <summary>
+        /// Defines the default set of <see cref="SecurityType"/> values that support <see cref="OrderType.MarketOnOpen"/> orders.
+        /// </summary>
+        private static readonly IReadOnlySet<SecurityType> _defaultMarketOnOpenSupportedSecurityTypes = new HashSet<SecurityType>
+        {
+            SecurityType.Cfd,
+            SecurityType.Equity,
+            SecurityType.Option,
+            SecurityType.FutureOption,
+            SecurityType.IndexOption
+        };
+
+        /// <summary>
         /// The default markets for the IB brokerage
         /// </summary>
         public new static readonly IReadOnlyDictionary<SecurityType, string> DefaultMarketMap = new Dictionary<SecurityType, string>
@@ -151,16 +163,14 @@ namespace QuantConnect.Brokerages
 
                 return false;
             }
-            else if (order.Type == OrderType.MarketOnClose && security.Type != SecurityType.Future && security.Type != SecurityType.Equity)
+            else if (order.Type == OrderType.MarketOnClose && security.Type != SecurityType.Future && security.Type != SecurityType.Equity && security.Type != SecurityType.Cfd)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, $"Unsupported order type for {security.Type} security type",
                     "InteractiveBrokers does not support Market-on-Close orders for other security types different than Future and Equity.");
                 return false;
             }
-            else if (order.Type == OrderType.MarketOnOpen && security.Type != SecurityType.Equity && !security.Type.IsOption())
+            else if (!BrokerageExtensions.ValidateMarketOnOpenOrder(security, order, GetMarketOnOpenAllowedWindow, _defaultMarketOnOpenSupportedSecurityTypes, out message))
             {
-                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, $"Unsupported order type for {security.Type} security type",
-                    "InteractiveBrokers does not support Market-on-Open orders for other security types different than Option and Equity.");
                 return false;
             }
 
@@ -323,5 +333,18 @@ namespace QuantConnect.Brokerages
                 {"SGD", Tuple.Create(35000m, 8000000m)},
                 {"ZAR", Tuple.Create(350000m, 100000000m)}
             };
+
+        /// <summary>
+        /// Returns the allowed Market-on-Open submission window for a <see cref="MarketHoursSegment"/>.
+        /// </summary>
+        /// <param name="marketHours">The market hours segment for the security.</param>
+        /// <returns>
+        /// A tuple with <c>MarketOnOpenWindowStart</c> and <c>MarketOnOpenWindowEnd</c>, 
+        /// adjusted to avoid IB order rejections at exact market boundaries.
+        /// </returns>
+        private (TimeOnly MarketOnOpenWindowStart, TimeOnly MarketOnOpenWindowEnd) GetMarketOnOpenAllowedWindow(MarketHoursSegment marketHours)
+        {
+            return (TimeOnly.FromTimeSpan(marketHours.End), TimeOnly.FromTimeSpan(marketHours.Start.Add(-TimeSpan.FromMinutes(2))));
+        }
     }
 }

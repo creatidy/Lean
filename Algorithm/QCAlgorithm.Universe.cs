@@ -37,6 +37,7 @@ namespace QuantConnect.Algorithm
         private bool _pendingUniverseAdditions;
         private ConcurrentSet<Symbol> _rawNormalizationWarningSymbols = new ConcurrentSet<Symbol>();
         private readonly int _rawNormalizationWarningSymbolsMaxCount = 10;
+        private bool _coarseFineUniverseObsoleteLogSent;
 
         /// <summary>
         /// Gets universe manager which holds universes keyed by their symbol
@@ -80,7 +81,8 @@ namespace QuantConnect.Algorithm
                     _pendingUserDefinedUniverseSecurityAdditions.Select(x => x.Security)))
                 {
                     // check for any derivative securities and mark the underlying as raw
-                    if (Securities.Any(skvp => skvp.Key.SecurityType != SecurityType.Base && skvp.Key.HasUnderlyingSymbol(security.Symbol)))
+                    if (security.Type == SecurityType.Equity &&
+                        Securities.Any(skvp => skvp.Key.SecurityType != SecurityType.Base && skvp.Key.HasUnderlyingSymbol(security.Symbol)))
                     {
                         // set data mode raw and default volatility model
                         ConfigureUnderlyingSecurity(security);
@@ -116,7 +118,10 @@ namespace QuantConnect.Algorithm
                         }
 
                         // set data mode raw and default volatility model
-                        ConfigureUnderlyingSecurity(underlyingSecurity);
+                        if (underlyingSecurity.Symbol.SecurityType == SecurityType.Equity)
+                        {
+                            ConfigureUnderlyingSecurity(underlyingSecurity);
+                        }
 
                         if (LiveMode && underlyingSecurity.GetLastData() == null)
                         {
@@ -430,10 +435,10 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Creates a new universe and adds it to the algorithm. This is for coarse fundamental US Equity data and
+        /// Creates a new universe and adds it to the algorithm. This is for fundamental US Equity data and
         /// will be executed on day changes in the NewYork time zone (<see cref="TimeZones.NewYork"/>)
         /// </summary>
-        /// <param name="selector">Defines an initial coarse selection</param>
+        /// <param name="selector">Defines an initial fundamental selection</param>
         [DocumentationAttribute(Universes)]
         public Universe AddUniverse(Func<IEnumerable<Fundamental>, IEnumerable<Symbol>> selector)
         {
@@ -441,11 +446,11 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Creates a new universe and adds it to the algorithm. This is for coarse fundamental US Equity data and
+        /// Creates a new universe and adds it to the algorithm. This is for fundamental US Equity data and
         /// will be executed based on the provided <see cref="IDateRule"/> in the NewYork time zone (<see cref="TimeZones.NewYork"/>)
         /// </summary>
         /// <param name="dateRule">Date rule that will be used to set the <see cref="Data.UniverseSelection.UniverseSettings.Schedule"/></param>
-        /// <param name="selector">Defines an initial coarse selection</param>
+        /// <param name="selector">Defines an initial fundamental selection</param>
         [DocumentationAttribute(Universes)]
         public Universe AddUniverse(IDateRule dateRule, Func<IEnumerable<Fundamental>, IEnumerable<Symbol>> selector)
         {
@@ -460,9 +465,16 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <param name="coarseSelector">Defines an initial coarse selection</param>
         /// <param name="fineSelector">Defines a more detailed selection with access to more data</param>
+        [Obsolete("This method is obsolete, please use AddUniverse(Func<IEnumerable<Fundamental>, IEnumerable<Symbol>> selector) instead")]
         [DocumentationAttribute(Universes)]
         public Universe AddUniverse(Func<IEnumerable<CoarseFundamental>, IEnumerable<Symbol>> coarseSelector, Func<IEnumerable<FineFundamental>, IEnumerable<Symbol>> fineSelector)
         {
+            if (!_coarseFineUniverseObsoleteLogSent)
+            {
+                Debug("Warning: AddUniverse(coarseSelector, fineSelector) is obsolete, please use AddUniverse(Func<IEnumerable<Fundamental>, IEnumerable<Symbol>> selector) instead.");
+                _coarseFineUniverseObsoleteLogSent = true;
+            }
+
             var coarse = new CoarseFundamentalUniverse(UniverseSettings, coarseSelector);
 
             return AddUniverse(new FineFundamentalFilteredUniverse(coarse, fineSelector));
