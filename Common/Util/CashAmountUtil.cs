@@ -13,21 +13,25 @@
  * limitations under the License.
 */
 
-using System.Linq;
+using QuantConnect.Securities;
 
-namespace QuantConnect.Indicators
+namespace QuantConnect.Util
 {
     /// <summary>
-    /// The advance-decline ratio (ADR) compares the number of stocks 
-    /// that closed higher against the number of stocks 
-    /// that closed lower than their previous day's closing prices.
+    /// Provides utility methods for working with <see cref="CashAmount"/> instances
     /// </summary>
-    public class AdvanceDeclineRatio : AdvanceDeclineIndicator
+    public static class CashAmountUtil
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AdvanceDeclineRatio"/> class
+        /// Determines if a cash balance should be added to the cash book
         /// </summary>
-        public AdvanceDeclineRatio(string name = "A/D Ratio")
-            : base(name, (entries) => entries.Count(), (advance, decline) => decline == 0m ? advance : advance / decline) { }
+        /// <param name="balance">The cash balance to check</param>
+        /// <param name="accountCurrency">The algorithm's account currency</param>
+        /// <returns>True if the balance should be added, false otherwise</returns>
+        public static bool ShouldAddCashBalance(CashAmount balance, string accountCurrency)
+        {
+            // Don't add zero quantity currencies except the account currency
+            return balance.Amount != 0 || balance.Currency == accountCurrency;
+        }
     }
 }
