@@ -2013,11 +2013,9 @@ namespace QuantConnect.Algorithm
             var securityFillForward = fillForward;
             if (isCanonical)
             {
-                // option is daily only, for now exclude FOPs
-
-                // Adrian Tkacz - Commented line due to options testing 
-                // securityResolution = Resolution.Daily;
-                // securityFillForward = false;
+                // canonical options and futures are daily only
+                securityResolution = Resolution.Daily;
+                securityFillForward = false;
             }
 
             var isFilteredSubscription = !isCanonical;
@@ -3437,22 +3435,7 @@ namespace QuantConnect.Algorithm
         public OptionChains OptionChains(IEnumerable<Symbol> symbols, bool flatten = false)
         {
             var canonicalSymbols = symbols.Select(GetCanonicalOptionSymbol).ToList();
-            var optionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType != SecurityType.FutureOption);
-            var futureOptionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType == SecurityType.FutureOption);
-
-            // Adrian Tkacz - fix for live trading (now solution is not working live)
-            //var optionChainsData = History(optionCanonicalSymbols, 1).GetUniverseData()
-            //    .Select(x => (x.Keys.Single(), x.Values.Single().Cast<OptionUniverse>()));
-            var optionChainsData = optionCanonicalSymbols.Select(symbol =>
-            {
-                var optionChainData = OptionChainProvider.GetOptionContractList(symbol, Time)
-                    .Select(contractSymbol => new OptionUniverse()
-                    {
-                        Symbol = contractSymbol,
-                        EndTime = Time.Date,
-                    });
-                return (symbol, optionChainData);
-            });
+            var optionChainsData = GetChainsData<OptionUniverse>(canonicalSymbols);
 
             var chains = new OptionChains(Time.Date, flatten);
             foreach (var (symbol, contracts) in optionChainsData)
