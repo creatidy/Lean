@@ -15,7 +15,8 @@
 				"ms-python.python",
 				"eamodio.gitlens",
 				"yzhang.markdown-all-in-one",
-				"SonarSource.sonarlint-vscode"
+				"SonarSource.sonarlint-vscode",
+				"openai.chatgpt"
 			],
 			// Set *default* vscode specific settings.json values on container create.
 			"settings": {
@@ -40,5 +41,6 @@
 	"mounts": [
 		// Example data mount from local machine, must use target directory in Config.json
 		// "source=C:/Users/XXXXXXXXXXXX/Lean/Data,target=/Data,type=bind,consistency=cached" 
+		"source=C:\\Users\\adria\\workspace\\QC_Organizations\\Ed_Searancke\\OptionsTradingAlgo,target=/LeanCLI,type=bind,consistency=cached"
 	]
 }
