@@ -14,7 +14,6 @@
 */
 
 using System;
-using RestSharp;
 using QuantConnect.Api;
 using System.Threading;
 
@@ -76,8 +75,7 @@ namespace QuantConnect.Brokerages.Authentication
 
             try
             {
-                var request = new RestRequest("live/auth0/refresh", Method.POST);
-                request.AddJsonBody(_jsonBodyRequest);
+                using var request = ApiUtils.CreateJsonPostRequest("live/auth0/refresh", _jsonBodyRequest);
 
                 if (_apiClient.TryRequest<TResponse>(request, out var response))
                 {

@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
@@ -30,6 +31,7 @@ namespace QuantConnect.Algorithm.CSharp
     public class DelistedFutureLiquidateRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         private Symbol _contractSymbol;
+        private bool _contractRemoved;
         protected virtual Resolution Resolution => Resolution.Minute;
 
         /// <summary>
@@ -65,8 +67,21 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
+        public override void OnSecuritiesChanged(SecurityChanges changes)
+        {
+            if (changes.RemovedSecurities.Any(x => x.Symbol == _contractSymbol))
+            {
+                _contractRemoved = true;
+            }
+        }
+
         public override void OnEndOfAlgorithm()
         {
+            if (!_contractRemoved)
+            {
+                throw new RegressionTestException($"Contract {_contractSymbol} was not removed from the algorithm");
+            }
+
             Log($"{_contractSymbol}: {Securities[_contractSymbol].Invested}");
             if (Securities[_contractSymbol].Invested)
             {

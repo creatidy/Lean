@@ -40,6 +40,7 @@ using QuantConnect.Algorithm.Framework.Alphas.Analysis;
 using QuantConnect.Commands;
 using QuantConnect.Algorithm.Framework.Portfolio.SignalExports;
 using QuantConnect.Algorithm.Framework.Execution;
+using Common.Util;
 
 namespace QuantConnect.AlgorithmFactory.Python.Wrappers
 {
@@ -681,7 +682,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <summary>
         /// Gets a read-only dictionary with all current parameters
         /// </summary>
-        public IReadOnlyDictionary<string, string> GetParameters() => _baseAlgorithm.GetParameters();
+        public ReadOnlyExtendedDictionary<string, string> GetParameters() => _baseAlgorithm.GetParameters();
 
         /// <summary>
         /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
@@ -1087,9 +1088,23 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// Get the last known price using the history provider.
         /// Useful for seeding securities with the correct price
         /// </summary>
-        /// <param name="security"><see cref="Security"/> object for which to retrieve historical data</param>
+        /// <param name="symbol">Symbol for which to retrieve historical data</param>
         /// <returns>A single <see cref="BaseData"/> object with the last known price</returns>
-        public BaseData GetLastKnownPrice(Security security) => _baseAlgorithm.GetLastKnownPrice(security);
+        public BaseData GetLastKnownPrice(Symbol symbol) => _baseAlgorithm.GetLastKnownPrice(symbol);
+
+        /// <summary>
+        /// Yields data to warmup a security for all it's subscribed data types
+        /// </summary>
+        /// <param name="symbol">Symbol for which to retrieve historical data</param>
+        /// <returns>Securities historical data</returns>
+        public IEnumerable<BaseData> GetLastKnownPrices(Symbol symbol) => _baseAlgorithm.GetLastKnownPrices(symbol);
+
+        /// <summary>
+        /// Yields data to warm up multiple securities for all their subscribed data types
+        /// </summary>
+        /// <param name="symbols">The symbols we want to get seed data for</param>
+        /// <returns>Securities historical data</returns>
+        public DataDictionary<IEnumerable<BaseData>> GetLastKnownPrices(IEnumerable<Symbol> symbols) => _baseAlgorithm.GetLastKnownPrices(symbols);
 
         /// <summary>
         /// Set the runtime error
@@ -1281,6 +1296,11 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="command">The callback command instance</param>
         /// <returns>The command result</returns>
         public CommandResultPacket RunCommand(CallbackCommand command) => _baseAlgorithm.RunCommand(command);
+
+        /// <summary>
+        /// Gets the default order properties
+        /// </summary>
+        public IOrderProperties DefaultOrderProperties => _baseAlgorithm.DefaultOrderProperties;
 
         /// <summary>
         /// Dispose of this instance
