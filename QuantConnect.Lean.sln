@@ -56,12 +56,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.Optimizer.Laun
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.DownloaderDataProvider.Launcher", "DownloaderDataProvider\QuantConnect.DownloaderDataProvider.Launcher.csproj", "{D139191E-50D5-4284-AC9C-247ED60950F4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.InteractiveBrokersBrokerage", "..\Lean.Brokerages.InteractiveBrokers\QuantConnect.InteractiveBrokersBrokerage\QuantConnect.InteractiveBrokersBrokerage.csproj", "{5D4D9735-0CBF-4751-AB83-53B58F4C0F93}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.DataSource", "..\Lean.DataSource.CBOE\QuantConnect.DataSource.csproj", "{DB4C3043-4957-484D-8FC8-A829C6453231}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.DataSource.EODHD", "DataSource\EODHD\QuantConnect.DataSource.EODHD.csproj", "{B3020529-02DD-D080-3731-58B923489B35}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -158,18 +152,6 @@ Global
 		{D139191E-50D5-4284-AC9C-247ED60950F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D139191E-50D5-4284-AC9C-247ED60950F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D139191E-50D5-4284-AC9C-247ED60950F4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5D4D9735-0CBF-4751-AB83-53B58F4C0F93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5D4D9735-0CBF-4751-AB83-53B58F4C0F93}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5D4D9735-0CBF-4751-AB83-53B58F4C0F93}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5D4D9735-0CBF-4751-AB83-53B58F4C0F93}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DB4C3043-4957-484D-8FC8-A829C6453231}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DB4C3043-4957-484D-8FC8-A829C6453231}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DB4C3043-4957-484D-8FC8-A829C6453231}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DB4C3043-4957-484D-8FC8-A829C6453231}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B3020529-02DD-D080-3731-58B923489B35}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B3020529-02DD-D080-3731-58B923489B35}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B3020529-02DD-D080-3731-58B923489B35}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B3020529-02DD-D080-3731-58B923489B35}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
